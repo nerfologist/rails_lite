@@ -7,8 +7,10 @@ require 'pry-debugger'
 require_relative 'params'
 require_relative 'session'
 require_relative 'flash'
+require_relative 'url_helper'
 
 class ControllerBase
+  include UrlHelper
   attr_reader :params, :req, :res
 
   # require CSRF tokens for following request methods
