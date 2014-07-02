@@ -1,0 +1,9 @@
+.DS_Store
+*~
+.#*
+*.db
+node_modules
+a.out
+issued_auth_tokens.yml
+nokogiri_test.rb
+regex_test.rb
