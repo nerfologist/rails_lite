@@ -12,6 +12,14 @@ class Params
     @params.merge!(parse_www_encoded_form(req.query_string))
     @params.merge!(parse_www_encoded_form(req.body))
   end
+  
+  def auth_token
+    @params['authenticity_token']
+  end
+  
+  def delete(key)
+    @params.delete(key)
+  end
 
   def [](key)
     @params[key]

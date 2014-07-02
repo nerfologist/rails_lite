@@ -11,17 +11,44 @@ require_relative 'flash'
 class ControllerBase
   attr_reader :params, :req, :res
 
+  # require CSRF tokens for following request methods
+  CSRF_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
+
   # setup the controller
   def initialize(req, res, route_params = {})
     @req = req
     @res = res
     @already_built_response = false
     @params = Params.new(req, route_params)
+    
+    # CSRF token verification
     begin
       @issued_tokens = YAML.load_file('issued_auth_tokens.yml')
-    rescue SystemCallError => sys_err
+    rescue SystemCallError # basically, 'file not found'
       @issued_tokens = []
     end
+    
+    check_csrf # cross-site request forgery
+  end
+  
+  def check_csrf
+    # only check 'dangerous' methods (i.e. allow 'GET')
+    return unless CSRF_METHODS.include?(@req.request_method)
+    
+    client_token = @params.auth_token || (raise CsrfAuthenticityError.new(
+                                          'form authenticity token not found'))
+    
+    matching_server_token = @issued_tokens.find do
+      |h| h[:hash] == client_token
+    end
+    
+    unless matching_server_token
+      raise CsrfAuthenticityError.new
+    end
+      
+    # consume server-side token; clean up client params
+    @issued_tokens.delete(matching_server_token)
+    @params.delete('authenticity_token')
   end
 
   # helper method to alias @already_built_response
@@ -35,10 +62,10 @@ class ControllerBase
   def render_content(content, type)
     raise StandardError.new('Already built response') if @already_built_response
     
-    do_chores
     @res.content_type = type
     @res.body = inject_csrf_fields(content)
     @already_built_response = true
+    do_chores
   end
 
   # set the response status code and header
@@ -52,7 +79,7 @@ class ControllerBase
   end
   
   def do_chores
-    serialize_auth_tokens
+    serialize_auth_tokens # CSRF tokens issued are stored server-side
     session.store_session(@res)
     flash.store_flash(@res)
   end
@@ -84,8 +111,14 @@ class ControllerBase
   end
   
   def forum_authenticity_token
-    @issued_tokens << token = SecureRandom::urlsafe_base64(24)
-    token
+    token = {
+      hash: SecureRandom::urlsafe_base64(24),
+      issued_date: Time::now.utc.to_s,
+      remote_ip: @req.remote_ip
+    }
+    
+    @issued_tokens << token
+    token[:hash]
   end
   
   def serialize_auth_tokens
@@ -110,5 +143,11 @@ class ControllerBase
     
     # return noko_page with injected tokens
     injected ? noko_page.to_html : html
+  end
+end
+
+class CsrfAuthenticityError < ArgumentError
+  def initialize(msg = 'unable to authenticate form')
+    super('CSRF protection error: ' + msg)
   end
 end

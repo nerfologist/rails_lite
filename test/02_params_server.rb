@@ -18,8 +18,8 @@ class ExampleController < ControllerBase
   def new
     page = <<-END
 <form action="/" method="post">
-  <input type="text" name="cat[name]">
-  <input type="text" name="cat[owner]">
+  Cat name:<input type="text" name="cat[name]"><br>
+  Cat owner:<input type="text" name="cat[owner]"><br>
 
   <input type="submit">
 </form>
